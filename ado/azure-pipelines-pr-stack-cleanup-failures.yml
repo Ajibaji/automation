@@ -1,0 +1,29 @@
+name: $(Date:yyyyMMdd).$(Rev:r)
+
+variables:
+  - template: vars/base.yml
+  - group: automation
+
+pool: 
+  vmImage: ubuntu-latest
+
+trigger: none
+
+schedules:
+  - cron: "30 02 * * MON-FRI"
+    displayName: Weekdays at 02:30 UTC/03:30 BST 
+    branches:
+      include:
+        - main
+    always: true
+
+stages:
+  - stage: prCleanupFailures
+    displayName: PR Stack Cleanup Failures
+    jobs:
+      - template: jobs/stack-cleanup-failures.yml
+        parameters:
+          nodeVersion: $(NODE_VERSION)
+          SPN: ''
+          awsRole: ''
+          awsRegion: ''

@@ -1,0 +1,39 @@
+name: $(Date:yyyyMMdd).$(Rev:r)
+
+parameters:
+  - name: listOfPRStackNames
+    type: object
+    default:
+      - PROJECT-ONE-PR-
+      - PROJECT-TWO-PR-
+      - PROJECT-THREE-PR-
+
+variables:
+  - template: vars/base.yml
+  - group: automation
+
+pool: 
+  vmImage: ubuntu-latest
+
+trigger: none
+
+schedules:
+  - cron: "15,45 01 * * MON-FRI"
+    displayName: Weekdays at 01:15 UTC/02:15 BST and 01:45 UTC/02:45 BST" 
+    branches:
+      include:
+        - main
+    always: true
+
+stages:
+  - stage: prCleanup
+    displayName: PR Stack Cleanup
+    jobs:
+      - ${{ each prStackName in parameters.listOfPRStackNames }}:
+        - template: jobs/stack-cleanup.yml
+          parameters:
+            nodeVersion: $(NODE_VERSION)
+            stackName: ${{ prStackName }}
+            SPN: ''
+            awsRole: ''
+            awsRegion: ''

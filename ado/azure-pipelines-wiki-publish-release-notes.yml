@@ -1,0 +1,54 @@
+name: $(Date:yyyyMMdd).$(Rev:r)
+pool: 
+  vmImage: ubuntu-latest
+
+trigger: none
+
+resources:
+  pipelines:
+    - pipeline: pipeline-one
+      source: pipeline-one
+      trigger:
+        stages: 
+          - deployToProd 
+    - pipeline: pipeline-two
+      source: pipeline-two
+      trigger:
+        stages: 
+          - deployToProd
+
+variables:
+  - template: vars/base.yml 
+  - group: automation
+
+stages:
+  - stage: wiki 
+    displayName: Update wiki 
+    variables:
+      TRIGGERING_REPO: $[upper(variables['Resources.TriggeringAlias'])]
+      COMMIT_ID_KEY_NAME: RESOURCES_PIPELINE_$(TRIGGERING_REPO)_SOURCECOMMIT
+      ADO_ENVIRONMENT_ID_KEY_NAME: $(TRIGGERING_REPO)-PROD
+      WIKI_PAGE_ID_KEY_NAME: $(TRIGGERING_REPO)_WIKI_RELEASE_NOTES_PAGE_ID
+    jobs: 
+      - job: publish
+        displayName: Release notes
+        steps: 
+          - bash: |
+              echo "Working directory: $PWD"
+              env | sort
+            displayName: DEBUG
+
+          - bash: | 
+              # Workaround for dynamic variable names in shell
+              export ADO_ENVIRONMENT_ID=$(env | grep "$(ADO_ENVIRONMENT_ID_KEY_NAME)=" | cut -d'=' -f2-)
+              export COMMIT_ID=$(env | grep "$(COMMIT_ID_KEY_NAME)=" | cut -d'=' -f2-)
+              export WIKI_PAGE_ID=$(env | grep "$(WIKI_PAGE_ID_KEY_NAME)=" | cut -d'=' -f2-)
+
+              echo "ADO_ENVIRONMENT_ID: $ADO_ENVIRONMENT_ID" --
+              echo "COMMIT_ID: $COMMIT_ID" --
+              echo "WIKI_PAGE_ID: $WIKI_PAGE_ID" --
+              echo -------------------------------------------------------------------------------
+              node scripts/release-notes-to-wiki.mjs 
+            displayName: Publish 
+            env:
+              API_TOKEN: $(API_TOKEN)

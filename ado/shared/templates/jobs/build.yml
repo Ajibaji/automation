@@ -1,0 +1,76 @@
+parameters:
+  - name: artifactName
+    type: string
+    default: build
+  - name: nodeVersion
+    type: string
+    default: '14.x'
+  - name: projectRoot
+    type: string
+    default: $(System.DefaultWorkingDirectory)
+
+jobs:
+  - job: build
+    displayName: Build
+    variables:
+      npm_config_cache: $(Pipeline.Workspace)/.npm
+    steps:
+      - task: NodeTool@0
+        displayName: Install Node
+        inputs:
+          versionSpec: ${{ parameters.nodeVersion }}
+
+      - task: Cache@2
+        inputs:
+          key: 'npm | "$(Agent.OS)" | package-lock.json'
+          restoreKeys: |
+            npm | "$(Agent.OS)"
+          path: $(npm_config_cache)
+        displayName: Cache npm
+
+      - bash: |
+          env | sort
+        displayName: DEBUG
+
+      - bash: |
+          ls -alhR ${{ parameters.projectRoot }}
+        workingDirectory: ${{ parameters.projectRoot }}
+        displayName: 'DEBUG: List Project Files'
+
+      - task: Npm@1
+        displayName: Npm ci
+        inputs:
+          command: ci
+          workingDir: ${{ parameters.projectRoot }}
+
+      - task: Npm@1
+        displayName: Lerna Bootstrap
+        inputs:
+          command: custom
+          customCommand: run bootstrap
+          serviceDir: ${{ parameters.projectRoot }}
+
+      - task: Npm@1
+        displayName: 'Build: All'
+        inputs:
+          command: custom
+          customCommand: run build:ci
+          workingDir: ${{ parameters.projectRoot }}
+
+      - task: Npm@1
+        displayName: 'Package: All'
+        inputs:
+          command: custom
+          customCommand: run package:ci
+          workingDir: ${{ parameters.projectRoot }}
+
+      - bash: |
+          ls -alhR $(Build.ArtifactStagingDirectory)
+        workingDirectory: ${{ parameters.projectRoot }}
+        displayName: 'DEBUG: List Artifact Files'
+
+      - task: PublishPipelineArtifact@1
+        inputs:
+          path: $(Build.ArtifactStagingDirectory)
+          artifact: ${{ parameters.artifactName }}
+        displayName: Publish artifact

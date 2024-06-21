@@ -1,0 +1,53 @@
+name: $(Date:yyyyMMdd).$(Rev:r)
+
+parameters:
+  - name: service
+    type: string
+    default: 'PROJECT-ONE,sequential'
+    values:
+      - PROJECT-ONE,sequential # sequential pipline: dev -> qa -> int -> prod
+      - PROJECT-TWO,sequential
+      - PROJECT-THREE,streamlined # streamlined pipline: (dev+qa) -> int -> prod
+  - name: environment
+    type: string
+    default: 'INT'
+    values:
+      - PROD
+      - INT
+
+
+variables:
+  - template: vars/base.yml
+  - group: automation
+
+pool: 
+  vmImage: ubuntu-latest
+
+trigger: none
+
+stages:
+  - stage: releaseDiff
+    displayName: check release Diffs
+    jobs:
+      - template: jobs/change-list-generator.yml
+        parameters:
+          ${{ if endsWith(parameters.service, ',sequential') }}:
+            pipelineType: "sequential"
+            serviceNames: 
+              - ${{ replace(parameters.service, ',sequential', '') }}
+            ${{ if eq(parameters.environment, 'INT') }}:
+              fromEnvironmentId: 'QA'
+            ${{ if eq(parameters.environment, 'PROD') }}:
+              fromEnvironmentId: 'INT'
+          ${{ if endsWith(parameters.service, ',streamlined') }}:
+            pipelineType: "streamlined"
+            serviceNames: 
+              - ${{ replace(parameters.service, ',streamlined', '') }}
+            ${{ if eq(parameters.environment, 'INT') }}:
+              fromEnvironmentId: 'DEV'
+            ${{ if eq(parameters.environment, 'PROD') }}:
+              fromEnvironmentId: 'INT'
+          deploymentEnv: ${{ parameters.environment }}
+          toEnvironmentId: ${{ parameters.environment }}
+          nodeVersion: $(NODE_VERSION)
+          slackAlertUrl: $(SLACK_PATH_SERVICE_DEPLOYMENT_QUEUE)

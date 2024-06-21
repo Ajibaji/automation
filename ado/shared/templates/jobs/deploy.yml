@@ -1,0 +1,62 @@
+parameters:
+  - name: adoEnvironment
+    type: string
+    default: ''
+  - name: artifactName
+    type: string
+    default: build
+  - name: SPN
+    type: string
+    default: ''
+  - name: awsRegion
+    type: string
+    default: $(DEPLOY_REGION_DEFAULT)
+
+jobs:
+  - deployment: cdkDeploy
+    displayName: Deploy To AWS
+    environment: ${{ parameters.adoEnvironment }}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - task: NodeTool@0
+              displayName: Install Node
+              inputs:
+                versionSpec: $(NODE_VERSION)
+
+            - task: awsTokenBroker@1
+              displayName: Get temp AWS creds
+              inputs:
+                serviceConnection: ${{ parameters.SPN }}
+                roleName: ${{ parameters.SPN }}-role_AUTOMATION
+                region: ${{ parameters.awsRegion }}
+
+            - bash: |
+                env | sort
+              displayName: DEBUG
+              condition: always()
+              env:
+                SERVICE_BUILD_PATH: $(Pipeline.Workspace)/${{ parameters.artifactName }}/service
+
+            - bash: |
+                ls -alhR .
+              condition: always()
+              displayName: 'DEBUG: List Artifact Files'
+              workingDirectory: $(Pipeline.Workspace)/${{ parameters.artifactName }}
+
+            - script: |
+                node cdk/dist/bin/index.js deploy
+              workingDirectory: $(Pipeline.Workspace)/${{ parameters.artifactName }}
+              displayName: Deploy to AWS
+              env:
+                SERVICE_BUILD_PATH: $(Pipeline.Workspace)/${{ parameters.artifactName }}/service
+
+            - script: |
+                echo "cat deploy_output.txt: $(cat deploy_output.txt)"
+                URL=$(cat deploy_output.txt)
+                echo "URL=$URL"
+                echo "##vso[task.setvariable variable=gatewayUrl;isOutput=true]$URL"
+              workingDirectory: $(Pipeline.Workspace)/${{ parameters.artifactName }}
+              displayName: Set Gateway Url to env variable
+              name: setGatewayUrlEnvVariable

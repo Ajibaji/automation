@@ -1,0 +1,131 @@
+parameters:
+  - name: enableSastScan
+    type: boolean
+    default: true
+  - name: enableScaScan
+    type: boolean
+    default: true
+  - name: sastServiceConnection
+    type: string
+    default: ''
+  - name: scaServiceConnection
+    type: string
+    default: ''
+  - name: sastTeamName
+    type: string
+    default: ''
+  - name: scaTeamName
+    type: string
+    default: ''
+  - name: sastThresholdHigh
+    type: string
+    default: 0
+  - name: sastThresholdMedium
+    type: string
+    default: 3
+  - name: sastThresholdLow
+    type: string
+    default: 10
+  - name: scaThresholdHigh
+    type: string
+    default: 0
+  - name: scaThresholdMedium
+    type: string
+    default: 3
+  - name: scaThresholdLow
+    type: string
+    default: 10
+  - name: scanTimeout
+    type: string
+    default: 10
+
+jobs:
+  - job: checkmarx
+    displayName: SAST & SCA
+    timeoutInMinutes: ${{ parameters.scanTimeout }}
+    variables:
+      - name: PROJECT_NAME
+        ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/main')}}:
+          value: $(Build.Repository.Name)
+        ${{ if ne(variables['Build.SourceBranch'], 'refs/heads/main')}}:
+          value: $(Build.Repository.Name)--feature
+    steps:
+      - bash: |
+          env | sort
+        displayName: DEBUG
+
+      - bash: |
+          function removeDevDeps () {
+            JSON_FILE=$1
+            echo "Removing dev dependencies from $JSON_FILE"
+            MD5=`md5sum $JSON_FILE | awk '{print $1}'`
+            TEMP_FILE=$AGENT_TEMPDIRECTORY/$MD5.tmp
+
+            case $JSON_FILE in
+              *"/package-lock.json")
+                cat $JSON_FILE | jq '. | del(.dependencies[] | select(has("dev") | . == true))' > $TEMP_FILE
+                mv $TEMP_FILE $JSON_FILE
+                ;;
+              *"/package.json")
+                cat $JSON_FILE | jq '. | del(.devDependencies)' > $TEMP_FILE
+                mv $TEMP_FILE $JSON_FILE
+                ;;
+            esac
+          }
+
+          printHeading() { printf "%119s\n" ${@}— | sed -e 's/ /—/g'; }
+
+          printHeading REMOVE—DEV—DEPENDENCIES
+          echo ""
+          echo "+----------------------------------------------------------------------------------------+"
+          echo "| Checkmarx CxSCA includes dev dependencies in its scan and threshold values. Currently, |"
+          echo "| this is not configurable and so, for now, we accomodate by searching the repo for      |"
+          echo "| package.json and package-lock.json files, removing dev dependencies from each file     |"
+          echo "| found before submitting for a CxSCA scan                                               |"
+          echo "+----------------------------------------------------------------------------------------+"
+          echo ""
+
+          for file in $(find . \( -name 'package-lock.json' -o -name 'package.json' \) -not -path "*/node_modules/*")
+          do
+            removeDevDeps $file
+          done
+        displayName: Prune dev deps
+        continueOnError: false
+    
+      - template: ../steps/checkmarx-task.yml
+        parameters:
+          name: "Application Security Testing"
+          shouldContinueOnError: false
+          runCondition: and(succeededOrFailed(), eq(variables['impactedServiceCheckmarx'], 'false'))
+          enableSastScan: ${{ parameters.enableSastScan }}
+          enableScaScan: ${{ parameters.enableScaScan }}
+          sastServiceConnection: ${{ parameters.sastServiceConnection }}
+          scaServiceConnection: ${{ parameters.scaServiceConnection }}
+          sastTeamName: ${{ parameters.sastTeamName }}
+          scaTeamName: ${{ parameters.scaTeamName }}
+          sastThresholdHigh: ${{ parameters.sastThresholdHigh }}
+          sastThresholdMedium: ${{ parameters.sastThresholdMedium }}
+          sastThresholdLow: ${{ parameters.sastThresholdLow }}
+          scaThresholdHigh: ${{ parameters.scaThresholdHigh }}
+          scaThresholdMedium: ${{ parameters.scaThresholdMedium }}
+          scaThresholdLow: ${{ parameters.scaThresholdLow }}
+          scanTimeout: ${{ parameters.scanTimeout }}
+    
+      - template: ../steps/checkmarx-task.yml
+        parameters:
+          name: "Application Security Testing (impacted)"
+          shouldContinueOnError: true
+          runCondition: and(succeededOrFailed(), eq(variables['impactedServiceCheckmarx'], 'true'))
+          enableSastScan: ${{ parameters.enableSastScan }}
+          enableScaScan: ${{ parameters.enableScaScan }}
+          sastServiceConnection: ${{ parameters.sastServiceConnection }}
+          scaServiceConnection: ${{ parameters.scaServiceConnection }}
+          sastTeamName: ${{ parameters.sastTeamName }}
+          scaTeamName: ${{ parameters.scaTeamName }}
+          sastThresholdHigh: ${{ parameters.sastThresholdHigh }}
+          sastThresholdMedium: ${{ parameters.sastThresholdMedium }}
+          sastThresholdLow: ${{ parameters.sastThresholdLow }}
+          scaThresholdHigh: ${{ parameters.scaThresholdHigh }}
+          scaThresholdMedium: ${{ parameters.scaThresholdMedium }}
+          scaThresholdLow: ${{ parameters.scaThresholdLow }}
+          scanTimeout: ${{ parameters.scanTimeout }}

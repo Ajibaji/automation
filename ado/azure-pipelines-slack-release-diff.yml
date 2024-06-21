@@ -1,0 +1,68 @@
+name: $(Date:yyyyMMdd).$(Rev:r)
+
+parameters:
+  - name: listOfEnvironmentsSequentialPipeline # sequential pipline: dev -> qa -> int -> prod
+    type: object
+    default:
+      - environmentName: INT
+        fromEnvironment: QA
+      - environmentName: PROD
+        fromEnvironment: INT
+  - name: listOfEnvironmentsStreamlinedPipeline # streamlined pipline: (dev+qa) -> int -> prod
+    type: object
+    default:
+      - environmentName: INT
+        fromEnvironment: DEV
+      - environmentName: PROD
+        fromEnvironment: INT
+  - name: listOfServicesSequentialPipeline # sequential pipline: dev -> qa -> int -> prod
+    type: object
+    default:
+      - PROJECT-ONE
+      - PROJECT-TWO
+  - name: listOfServicesStreamlinedPipeline # streamlined pipline: (dev+qa) -> int -> prod
+    type: object
+    default:
+      - PROJECT-THREE
+
+variables:
+  - template: vars/base.yml
+  - group: automation
+
+pool: 
+  vmImage: ubuntu-latest
+
+trigger: none
+
+schedules:
+  - cron: "30 06 * * MON-FRI"
+    displayName: Weekdays at 06:30 UTC/07:30 BST for start of day 
+    branches:
+      include:
+        - main
+    always: true
+
+stages:
+  - stage: releaseDiff
+    displayName: check release Diffs
+    jobs:
+      - ${{ each env in parameters.listOfEnvironmentsSequentialPipeline }}:
+        - template: jobs/change-list-generator.yml
+          parameters:
+            pipelineType: "sequential"
+            deploymentEnv: ${{ env.environmentName }}
+            serviceNames: ${{ parameters.listOfServicesSequentialPipeline }}
+            fromEnvironmentId: ${{ env.fromEnvironment }}
+            toEnvironmentId: ${{ env.environmentName }}
+            nodeVersion: $(NODE_VERSION)
+            slackAlertUrl: $(SLACK_PATH_SERVICE_DEPLOYMENT_QUEUE)
+      - ${{ each env in parameters.listOfEnvironmentsStreamlinedPipeline }}:
+        - template: jobs/change-list-generator.yml
+          parameters:
+            pipelineType: "streamlined"
+            deploymentEnv: ${{ env.environmentName }}
+            serviceNames: ${{ parameters.listOfServicesStreamlinedPipeline }}
+            fromEnvironmentId: ${{ env.fromEnvironment }}
+            toEnvironmentId: ${{ env.environmentName }}
+            nodeVersion: $(NODE_VERSION)
+            slackAlertUrl: $(SLACK_PATH_SERVICE_DEPLOYMENT_QUEUE)

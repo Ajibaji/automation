@@ -1,0 +1,43 @@
+parameters:
+  - name: nodeVersion
+    type: string
+    default: "14.x"
+  - name: stackName
+    type: string
+  - name: SPN
+    type: string
+  - name: awsRegion
+    type: string
+  - name: awsRole
+    type: string
+
+jobs:
+  - job: stack_cleanup_${{ replace(parameters.stackName, '-', '_') }}
+    displayName: Remove all Stacks for ${{ parameters.stackName }}
+    steps:
+      - task: NodeTool@0
+        displayName: Install Node
+        retryCountOnTaskFailure: 3
+        inputs:
+          versionSpec: ${{ parameters.nodeVersion}}
+
+      - task: awsTokenBroker@1
+        displayName: Get temp AWS creds
+        retryCountOnTaskFailure: 3
+        inputs:
+          serviceConnection: ${{ parameters.SPN }}
+          roleName: ${{ parameters.awsRole }}
+          region: ${{ parameters.awsRegion}}
+
+      - bash: |
+          env | sort
+        displayName: DEBUG
+
+      - bash: |
+          node ./stack-cleanup.mjs
+        displayName: "Cleanup PR Stacks"
+        retryCountOnTaskFailure: 3
+        workingDirectory: scripts
+        env:
+          STACK_NAME_PREFIX: ${{ parameters.stackName }}
+          AWS_REGION: ${{ parameters.awsRegion}}

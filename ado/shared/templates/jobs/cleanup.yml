@@ -1,0 +1,72 @@
+parameters:
+  - name: SPN
+    type: string
+    default: ''
+  - name: awsRegion
+    type: string
+    default: $(DEPLOY_REGION_DEFAULT)
+  - name: projectRoot
+    type: string
+    default: ''
+
+jobs:
+  - job: Cleanup
+    displayName: Remove PR stacks
+    variables:
+      awsRole: '${{ parameters.SPN }}-role_AUTOMATION'
+    steps:
+      - task: NodeTool@0
+        displayName: Install Node
+        inputs:
+          versionSpec: $(NODE_VERSION)
+
+      - task: awsTokenBroker@1
+        displayName: Get temp AWS creds
+        inputs:
+          serviceConnection: ${{ parameters.SPN }}
+          roleName: ${{ variables.awsRole }}
+          region: ${{ parameters.awsRegion}}
+
+      - bash: |
+          env | sort
+        displayName: DEBUG
+
+      - bash: |
+          ls -alhR $(Build.ArtifactStagingDirectory)
+        workingDirectory: ${{ parameters.projectRoot }}
+        displayName: 'DEBUG: List Artifact Files'
+
+      - task: Npm@1
+        displayName: install deps
+        inputs:
+          command: ci
+          workingDir: $(PROJECT_ROOT)
+
+      - task: Npm@1
+        displayName: Lerna Bootstrap
+        inputs:
+          command: custom
+          customCommand: run bootstrap
+          serviceDir: ${{ parameters.projectRoot }}
+
+      - task: Npm@1
+        displayName: 'build'
+        inputs:
+          command: custom
+          customCommand: run build:ci
+          workingDir: $(PROJECT_ROOT)
+
+      - task: Npm@1
+        displayName: 'Package: All'
+        inputs:
+          command: custom
+          customCommand: run package:ci
+          workingDir: ${{ parameters.projectRoot }}
+
+      - task: Npm@1
+        displayName: Delete PR Stacks
+        inputs:
+          command: custom
+          customCommand: run delete:pr:stacks
+          workingDir: ${{ parameters.projectRoot }}
+

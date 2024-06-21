@@ -1,0 +1,50 @@
+parameters:
+  - name: adoEnvironment
+    type: string
+    default: ''
+  - name: name
+    type: string
+    default: ''
+  - name: artifactName
+    type: string
+    default: build
+  - name: pkgName
+    type: string
+    default: pkg
+  - name: feedName
+    type: string
+    default: ''
+
+jobs:
+  - deployment: publishAdoFeed${{ parameters.name }}
+    displayName: Publish To Feed ${{ parameters.feedName }}
+    environment: ${{ parameters.adoEnvironment }}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - task: NodeTool@0
+              displayName: Install Node
+              inputs:
+                versionSpec: $(NODE_VERSION)
+
+            - bash: |
+                ls -alhR .
+              condition: always()
+              displayName: 'DEBUG: List Artifact Files'
+              workingDirectory: $(Pipeline.Workspace)/${{ parameters.artifactName }}
+
+            - task: Npm@1
+              displayName: Ensure scoped registry is set to prevent accidental publish to npm
+              inputs:
+                command: custom
+                customCommand: config set @{registry-name}:registry https://pkgs.dev.azure.com/{ado-org-name}/{ado-project-name}/_packaging/${{ parameters.feedName }}/npm/registry/
+                workingDir: $(Pipeline.Workspace)/${{ parameters.artifactName }}/${{ parameters.pkgName }}
+
+            - task: Npm@1
+              inputs:
+                command: publish
+                publishRegistry: useFeed
+                publishFeed: {ado-project-name}/${{ parameters.feedName }}
+                workingDir: $(Pipeline.Workspace)/${{ parameters.artifactName }}/${{ parameters.pkgName }}
+
