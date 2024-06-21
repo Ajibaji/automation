@@ -1,0 +1,47 @@
+name: $(Date:yyyyMMdd).$(Rev:r)
+pool: 
+  vmImage: ubuntu-latest
+
+pr:
+  autoCancel: true
+  branches: 
+    include: 
+      - '*'
+  paths:
+    exclude: 
+      - README.md
+  
+trigger: none 
+
+variables:
+  - template: ado/vars/base.yml 
+  - group: automation
+
+jobs:
+  - job: lint 
+    displayName: Lint
+    steps:
+      - task: NodeTool@0
+        displayName: Install Node
+        inputs:
+          versionSpec: $(NODE_VERSION)
+          
+      - script: |
+          echo "Working directory: $PWD"
+          env | sort
+          tree
+        target:
+          settableVariables: none
+        displayName: DEBUG
+        condition: always()
+
+      - task: Npm@1
+        displayName: Npm ci
+        inputs:
+          command: ci
+
+      - task: Npm@1
+        displayName: Run Linter
+        inputs:
+          command: custom
+          customCommand: run lint

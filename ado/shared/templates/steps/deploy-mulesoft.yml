@@ -1,0 +1,95 @@
+parameters:
+  - name: serviceName
+    type: string
+  - name: mulesoftEndpoint
+    type: string
+    default: ""
+  - name: mulesoftAssetName
+    type: string
+    default: ""
+  - name: mulesoftContractFilePath
+    type: string
+    default: ""
+  - name: mulesoftDocFilePath
+    type: string
+    default: ""
+  - name: assetDescription
+    default: ""
+  - name: snowITSVCNumber
+    type: string
+    default: ""
+  - name: schemaMajorVersion
+    type: number
+  - name: schemaMinorVersion
+    type: number
+  - name: variableGroupId
+    type: string
+
+steps:
+  - bash: |
+      pwd
+      ls -laR
+      echo '${{ parameters.mulesoftContractFilePath }}'
+      if [ -f ${{ parameters.mulesoftContractFilePath }} ]; then
+        echo 'schema exists'
+      fi
+    displayName: DEBUG ls
+
+  - bash: |
+      INCREMENTED_PATCH=`expr ${MULESOFT_PATCH_VERSION} + 1`
+      echo "Incrementing Patch Version $MULESOFT_PATCH_VERSION to $INCREMENTED_PATCH"
+      echo "##vso[task.setvariable variable=schemaPatchVersionIncremented]${INCREMENTED_PATCH}"
+
+      FULL_VERSION="${{ parameters.schemaMajorVersion }}.${{ parameters.schemaMinorVersion }}.${INCREMENTED_PATCH}"
+      echo "Setting schemaFullVersion=$FULL_VERSION"
+      echo "##vso[task.setvariable variable=schemaFullVersion]${FULL_VERSION}"
+    displayName: Increment Api Path & Set Full Version
+
+  - bash: |
+      echo "The published mulesoft version will be $(schemaFullVersion)"
+      echo "After release, the patch version of $(schemaPatchVersionIncremented) will be saved to ado"
+    displayName: Debug Version
+
+  - bash: |
+      pwd
+      ls ${{ parameters.mulesoftContractFilePath }}
+      sed -r -e 's/ \{\{.*\}\}/ ""/g' -e 's/\{\{.*\}\}//g' ${{ parameters.mulesoftContractFilePath }} > schema.mulesoft.yaml
+      cp ${{ parameters.mulesoftDocFilePath }} schema.mulesoft.md
+    displayName: Preprocess schema file
+    condition: succeeded()
+
+  - publish: schema.mulesoft.yaml
+    artifact: MulesoftSchema-${{ parameters.serviceName }}
+    displayName: 'Publish Processed Schema Artifact'
+    condition: succeeded()
+
+  - publish: schema.mulesoft.md
+    artifact: MulesoftSchema-${{ parameters.serviceName }}-docs
+    displayName: 'Publish Schema Docs'
+    condition: succeeded()
+
+  - task: muleopsPublish@1
+    displayName: Publish API Docs
+    continueOnError: false
+    condition: succeeded()
+    inputs:
+      MuleSoftEndpoint: ${{ parameters.mulesoftEndpoint }} # service connection name
+      assetName: ${{ parameters.mulesoftAssetName }}
+      version: ${{ parameters.schemaMajorVersion }}.${{ parameters.schemaMinorVersion }}.$(schemaPatchVersionIncremented)
+      isGatewayAsset: true # if false, do not need contractFilePath
+
+      contractFilePath: schema.mulesoft.yaml
+      assetDescription: ${{ parameters.assetDescription }}
+      snowServiceNumber: ${{ parameters.snowITSVCNumber }}
+      homePageInputType: filePath
+      homePageFilePath: schema.mulesoft.md
+
+  - pwsh: |
+        az pipelines variable-group variable update `
+                          --group-id ${{ parameters.variableGroupId }} `
+                          --name MULESOFT_PATCH_VERSION `
+                          --value $(schemaPatchVersionIncremented)
+    displayName: Save Mulesoft Patch Version
+    condition: succeeded()
+    env:
+      AZURE_DEVOPS_EXT_PAT: $(system.accesstoken)

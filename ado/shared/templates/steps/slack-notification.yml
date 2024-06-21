@@ -1,0 +1,70 @@
+parameters:
+  # slackWebhookUrl is in the form of channelName=url,channelName2=url2
+  - name: slackWebhookUrl
+    type: string
+    default: ''
+  - name: targetEnvironment
+    type: string
+    default: 'DEV'
+
+steps:
+  - bash: |
+      env | sort
+
+      if [[ "${TARGET_ENVIRONMENT^^}" == *"INT"* || "${TARGET_ENVIRONMENT^^}" == *"PROD"*  ]]
+      then
+        IFS=',' read -a ADDR <<< "$SLACK_WEBHOOK_URLS"
+        for i in "${ADDR[@]}"; do
+          IFS='=' read -a webhook <<< $i
+          echo "Sending notification to the channel ${webhook[0]}"
+          curl -v -X POST -H 'Content-type: application/json' --data '{
+            "blocks": [
+              {
+                "type": "divider"
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*'${BUILD_REPOSITORY_NAME^^}' has just deployed to '${DEPLOY_ENVIRONMENT_NAME^^}'*\nThe new deployment has been promoted and is now receiving live traffic."
+                },
+                "accessory": {
+                  "type": "image",
+                  "image_url": "'${SLACK_DEPLOY_ALERT_ICON_URL}'",
+                  "alt_text": "go! go! go!"
+                }
+              },
+              {
+                "type": "divider"
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "Click for details."
+                },
+                "accessory": {
+                  "type": "button",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "View deployment",
+                    "emoji": true
+                  },
+                  "value": "view_deployment",
+                  "url": "'${ADO_ENVIRONMENT_URL}'",
+                  "action_id": "button-action"
+                }
+              }
+            ]
+          }' ${webhook[1]}
+        done
+      else
+        echo "This step only runs when deploying to INT or PROD environments"
+        exit 0
+      fi
+      exit 0 #-----------------------------never fail the pipeline because we couldnt post to slack
+    displayName: Slack notification
+    env:
+      ADO_ENVIRONMENT_URL: $(System.TeamFoundationCollectionUri)$(System.TeamProject)/_environments/$(ADO_ENVIRONMENT_ID)?view=resources
+      SLACK_WEBHOOK_URLS: ${{ parameters.slackWebhookUrl }}
+      TARGET_ENVIRONMENT: ${{ parameters.targetEnvironment }}

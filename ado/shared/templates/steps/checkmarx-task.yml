@@ -1,0 +1,82 @@
+parameters:
+  - name: enableSastScan
+    type: boolean
+    default: true
+  - name: enableScaScan
+    type: boolean
+    default: true
+  - name: sastServiceConnection
+    type: string
+    default: ''
+  - name: scaServiceConnection
+    type: string
+    default: ''
+  - name: sastTeamName
+    type: string
+    default: ''
+  - name: scaTeamName
+    type: string
+    default: ''
+  - name: sastThresholdHigh
+    type: string
+    default: 0
+  - name: sastThresholdMedium
+    type: string
+    default: 3
+  - name: sastThresholdLow
+    type: string
+    default: 10
+  - name: scaThresholdHigh
+    type: string
+    default: 0
+  - name: scaThresholdMedium
+    type: string
+    default: 3
+  - name: scaThresholdLow
+    type: string
+    default: 10
+  - name: scanTimeout
+    type: string
+    default: 10
+  - name: name
+    type: string
+    default: ''
+  - name: shouldContinueOnError
+    type: boolean
+    default: false
+  - name: runCondition
+
+steps:
+  - task: checkmarx.cxsast.cx-scan-task.Application security testing@2021
+    displayName: ${{ parameters.name }}
+    inputs:
+      projectName: '$(PROJECT_NAME)'
+      enableSastScan: ${{ parameters.enableSastScan }}
+      enableDependencyScan: ${{ parameters.enableScaScan }}
+      scanTimeout: ${{ parameters.scanTimeout }}
+      CheckmarxService: ${{ parameters.sastServiceConnection }}
+      dependencyServerURL: ${{ parameters.scaServiceConnection }}
+      dependencyFolderExclusion: 'cvs, .svn, .hg , .git, .bzr, bin , obj,  backup, .idea, node_modules, devops'
+      dependencyAccessControlURL: 'https://eu.platform.checkmarx.net'
+      dependencyWebAppURL: 'https://eu.sca.checkmarx.net'
+      dependencyTenant: {tenant-name}
+      fullTeamName: ${{ parameters.sastTeamName }}
+      scaTeam: ${{ parameters.scaTeamName }}
+      scaVulnerabilityThreshold: true
+      scaHigh: ${{ parameters.scaThresholdHigh }}
+      scaMedium: ${{ parameters.scaThresholdMedium }}
+      scaLow: ${{ parameters.scaThresholdLow }}
+      folderExclusion: 'cvs, .svn, .hg , .git, .bzr, bin , obj,  backup, .idea, __tests__, __mocks__, __fixtures__, node_modules, devops'
+      fileExtension: '!**/*.DS_Store, !**/*.ipr, !**/*.iws, !**/*.bak, !**/*.tmp, !**/*.aac, !**/*.aif, !**/*.iff, !**/*.m3u, !**/*.mid, !**/*.mp3, !**/*.mpa, !**/*.ra, !**/*.wav, !**/*.wma, !**/*.3g2, !**/*.3gp, !**/*.asf, !**/*.asx, !**/*.avi,!**/*.flv, !**/*.mov, !**/*.mp4, !**/*.mpg,  !**/*.rm, !**/*.swf, !**/*.vob, !**/*.wmv, !**/*.bmp, !**/*.gif, !**/*.jpg, !**/*.png, !**/*.psd, !**/*.tif, !**/*.swf, !**/*.jar, !**/*.zip, !**/*.rar, !**/*.exe, !**/*.dll, !**/*.pdb, !**/*.7z, !**/*.gz, !**/*.tar.gz, !**/*.tar, !**/*.gz, !**/*.ahtm, !**/*.ahtml, !**/*.fhtml, !**/*.hdm, !**/*.hdml,   !**/*.hsql, !**/*.ht, !**/*.hta, !**/*.htc, !**/*.htd, !**/*.war, !**/*.ear, !**/*.htmls, !**/*.ihtml, !**/*.mht, !**/*.mhtm, !**/*.mhtml, !**/*.ssi, !**/*.stm, !**/*.stml, !**/*.ttml, !**/*.txn, !**/*.xhtm, !**/*.xhtml, !**/*.class, !**/*.iml, !**/*.spec.*s, !**/*.stories.*s'
+      vulnerabilityThreshold: true
+      thresholdHigh: ${{ parameters.sastThresholdHigh }}
+      thresholdMedium: ${{ parameters.sastThresholdMedium }}
+      thresholdLow: ${{ parameters.sastThresholdLow }}
+      scaEnablePolicyViolations: false
+      enablePolicyViolations: false
+      incScan: true
+      includeSource: false
+      denyProject: false
+      avoidDuplicateScans: false
+    continueOnError: ${{ parameters.shouldContinueOnError }}
+    condition: ${{ parameters.runCondition }}

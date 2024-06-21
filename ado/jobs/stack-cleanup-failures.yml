@@ -1,0 +1,37 @@
+parameters:
+  - name: nodeVersion
+    type: string
+    default: "14.x"
+  - name: SPN
+    type: string
+  - name: awsRegion
+    type: string
+  - name: awsRole
+    type: string
+
+jobs:
+  - job: daily_stack_cleanup_failures
+    displayName: Check for stack cleanup failures
+    steps:
+      - task: NodeTool@0
+        displayName: Install Node
+        inputs:
+          versionSpec: ${{ parameters.nodeVersion}}
+
+      - task: awsTokenBroker@1
+        displayName: Get temp AWS creds
+        inputs:
+          serviceConnection: ${{ parameters.SPN }}
+          roleName: ${{ parameters.awsRole }}
+          region: ${{ parameters.awsRegion}}
+
+      - bash: |
+          env | sort
+        displayName: DEBUG
+
+      - bash: |
+          node ./stack-cleanup-failures.mjs
+        displayName: "Stack Cleanup Failures"
+        workingDirectory: scripts
+        env:
+          AWS_REGION: ${{ parameters.awsRegion}}

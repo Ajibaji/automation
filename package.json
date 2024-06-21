@@ -1,0 +1,31 @@
+{
+  "name": "auto-ado-wiki-release-notes",
+  "description": "A collection of automation scripts and pipelines in support of release notes generation and notification",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=7.0.0"
+  },
+  "scripts": {
+    "lint": "eslint scripts/**/*",
+    "lint:fix": "eslint scripts/**/* --fix",
+    "prepare": "husky install",
+    "user-stories:dev": "cd scripts && node -r dotenv/config user-stories-to-slack.mjs "
+  },
+  "keywords": [
+    "automation",
+    "pipeline",
+    "pipelines",
+    "release-notes",
+    "wiki",
+    "ado"
+  ],
+  "author": "Ammar Arjomandkhah",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "dotenv": "^16.0.3",
+    "eslint": "^8.18.0",
+    "husky": "^8.0.1"
+  }
+}

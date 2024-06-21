@@ -1,0 +1,39 @@
+name: $(Date:yyyyMMdd).$(Rev:r)
+
+parameters:
+  - name: listOfUserStackNames
+    type: object
+    default:
+      - PROJECT-ONE-USER-
+      - PROJECT-TWO-USER-
+      - PROJECT-THREE-USER-
+
+variables:
+  - template: vars/base.yml
+  - group: automation
+
+pool: 
+  vmImage: ubuntu-latest
+
+trigger: none
+
+schedules:
+  - cron: "15,45 01 * * SAT"
+    displayName: Saturday at 01:15 UTC/02:15 BST and 01:45 UTC/02:45 BST" 
+    branches:
+      include:
+        - main
+    always: true
+
+stages:
+  - stage: userCleanup
+    displayName: User Stack Cleanup
+    jobs:
+      - ${{ each userStackName in parameters.listOfUserStackNames }}:
+        - template: jobs/stack-cleanup.yml
+          parameters:
+            nodeVersion: $(NODE_VERSION)
+            stackName: ${{ userStackName }}
+            SPN: ''
+            awsRole: ''
+            awsRegion: ''

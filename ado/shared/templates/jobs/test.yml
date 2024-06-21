@@ -1,0 +1,106 @@
+parameters:
+  - name: nodeVersion
+    type: string
+    default: '14.x'
+  - name: projectRoot
+    type: string
+    default: $(System.DefaultWorkingDirectory)
+  - name: serviceDir
+    type: string
+    default: $(System.DefaultWorkingDirectory)
+  - name: testResultsBaseFileName
+    type: string
+    default: 'unit-test-results'
+
+jobs:
+  - job: test
+    displayName: Test
+    variables:
+      npm_config_cache: $(Pipeline.Workspace)/.npm
+    steps:
+      - task: NodeTool@0
+        displayName: Install Node
+        inputs:
+          versionSpec: ${{ parameters.nodeVersion }}
+
+      - task: Cache@2
+        inputs:
+          key: 'npm | "$(Agent.OS)" | package-lock.json'
+          restoreKeys: |
+            npm | "$(Agent.OS)"
+          path: $(npm_config_cache)
+        displayName: Cache npm
+
+      - script: |
+          env | sort
+        displayName: DEBUG
+        condition: always()
+
+      - bash: |
+          ls -alhR ${{ parameters.projectRoot }}
+        workingDirectory: ${{ parameters.projectRoot }}
+        displayName: 'DEBUG: List Project Files'
+
+      - task: Npm@1
+        displayName: Npm ci
+        inputs:
+          command: ci
+          workingDir: ${{ parameters.projectRoot }}
+
+      - task: Npm@1
+        displayName: Lerna Bootstrap
+        inputs:
+          command: custom
+          customCommand: run bootstrap
+          serviceDir: ${{ parameters.projectRoot }}
+
+      - task: Npm@1
+        displayName: npm run init:ci
+        inputs:
+          command: custom
+          customCommand: run init:ci
+          workingDir: ${{ parameters.projectRoot }}
+
+      - bash: |
+          ls -alhR ${{ parameters.projectRoot }}
+        workingDirectory: ${{ parameters.projectRoot }}
+        displayName: 'DEBUG: List Project Files'
+
+      - task: Npm@1
+        displayName: npm run lint
+        inputs:
+          command: custom
+          customCommand: run lint
+          workingDir: ${{ parameters.projectRoot }}
+        condition: succeededOrFailed()
+
+      - task: Npm@1
+        displayName: npm run test
+        inputs:
+          command: custom
+          customCommand: run test
+          workingDir: ${{ parameters.projectRoot }}
+        condition: succeededOrFailed()
+
+      - task: PublishCodeCoverageResults@1
+        displayName: Publish Code Coverage Results
+        inputs:
+          codeCoverageTool: Cobertura
+          summaryFileLocation: '${{ parameters.serviceDir }}/coverage/cobertura-coverage.xml'
+          failIfCoverageEmpty: true
+        condition: succeededOrFailed()
+
+      - task: PublishTestResults@2
+        displayName: Publish Unit Test Results
+        inputs:
+          testRunTitle: unit-tests
+          testResultsFiles: '${{ parameters.serviceDir }}/${{ parameters.testResultsBaseFileName }}.xml'
+          failTaskOnFailedTests: true
+        condition: succeededOrFailed()
+
+      - task: PublishPipelineArtifact@1
+        displayName: "Publish Artifact unit-test-results.xml"
+        inputs:
+          path: ${{ parameters.serviceDir }}/${{ parameters.testResultsBaseFileName }}.xml
+          artifact: unit-test-results-attempt-$(System.JobAttempt)
+        condition: succeededOrFailed()

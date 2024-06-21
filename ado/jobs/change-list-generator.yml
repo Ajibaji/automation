@@ -1,0 +1,50 @@
+parameters:
+  - name: nodeVersion
+    type: string
+    default: "14.x"
+  - name: pipelineType
+    type: string
+  - name: deploymentEnv
+    type: string
+    default: "INT"
+  - name: serviceNames
+    type: object
+    default:
+      - nope
+  - name: fromEnvironmentId
+    type: string
+    default: ""
+  - name: toEnvironmentId
+    type: string
+    default: ""
+  - name: slackAlertUrl 
+    type: string
+    default: ""
+
+jobs:
+  - job: daily_check_${{ parameters.pipelineType }}_${{ parameters.deploymentEnv }}
+    displayName: Check ${{ parameters.deploymentEnv }} for pending deployments (${{ parameters.pipelineType }} pipeline)
+    steps:
+      - task: NodeTool@0
+        displayName: Install Node
+        inputs:
+          versionSpec: ${{ parameters.nodeVersion}}
+
+      - ${{ each service in parameters.serviceNames }}:
+          - bash: |
+              node ./user-stories-to-slack.mjs
+            displayName: "Check pending ${{ service }}-${{ parameters.deploymentEnv }} deployments"
+            workingDirectory: scripts
+            env:
+              PIPELINE_TYPE: ${{ parameters.pipelineType }}
+              DEPLOYMENT_ENV: ${{ parameters.deploymentEnv }}
+              SYSTEM_TEAMPROJECT: {ado-project-name}
+              ADO_HOSTNAME: dev.azure.com
+              SYSTEM_TEAMFOUNDATIONSERVERURI: /{ado-org-name}/
+              API_TOKEN: $(API_TOKEN)
+              SLACK_ALERT_URL: ${{ parameters.slackAlertUrl }}
+              BUILD_ARTIFACTSTAGINGDIRECTORY: $(Build.ArtifactStagingDirectory)
+              SERVICE_NAME: ${{ service }}
+              FROM_ENVIRONMENT_ID: $(${{ service }}-${{ parameters.fromEnvironmentId }})
+              TO_ENVIRONMENT_ID: $(${{ service }}-${{ parameters.toEnvironmentId }})
+              BUILD_DEFINITION_ID: $(${{ service }}-BUILD-DEFINITION-ID)
